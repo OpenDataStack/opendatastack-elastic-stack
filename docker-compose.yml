@@ -1,19 +1,121 @@
-version: '2'
+---
+version: '2.3'
+
 services:
+  kong-database:
+    image: postgres:9.5.3
+    environment:
+      POSTGRES_USER: postgres_user
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: kong
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kong:
+    image: haufelexware/wicked.kong:latest
+    ports:
+      # - "7946:7946/tcp"
+      # - "7946:7946/udp"
+      - "8000:8000/tcp"
+      # - "8001:8001/tcp"
+      - "8443:8443/tcp"
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: postgres_user
+      KONG_PG_PASSWORD: postgres_password
+      # KONG_ADMIN_ACCESS_LOG: '/dev/stdout'
+      # KONG_ADMIN_ERROR_LOG: '/dev/stderr'
+      KONG_PROXY_ACCESS_LOG: '/dev/stdout'
+      KONG_PROXY_ERROR_LOG: '/dev/stderr'
+    depends_on:
+      kong-database:
+        condition: service_healthy
+    links:
+      - kibana
+    volumes:
+      # - './kong/kong.conf:/etc/kong/kong.conf'
+      - 'kong-plugin-jwt-vlm:/usr/local/share/lua/5.1/kong/plugins/jwt'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -I -s -L http://127.0.0.1:8000 || exit 1"]
+      interval: 5s
+      retries: 10
+
+  kong-plugin-jwt:
+    image: indiehosters/git
+    command: ["sh", "-c", "rm -rv /data; git clone https://$${GITHUB_USER}:@$${GITHUB_REPO} /data"]
+    environment:
+      - GITHUB_USER=angrycactus-bot
+      - GITHUB_REPO=github.com/OpenDataStack/kong-plugin-jwt
+    volumes:
+      - kong-plugin-jwt-vlm:/data
+    restart: 'no'
+    labels:
+      - io.rancher.container.start_once=true
+
+  kongfig:
+    image: mashupmill/kongfig
+    environment:
+      - OPENDATASTACK_DKAN_CONSUMER_JWT_KEY=dkan_medata
+      - OPENDATASTACK_DKAN_CONSUMER_JWT_SECRET=e71829c351aa4242c2719cbfbe671c09
+    volumes:
+      - kongfig-config-vlm:/data/
+    command: --path /data/opendatastack-kibana-jwt.js --host kong:8001
+    depends_on:
+      - kong
+
+  kongfig-config:
+    image: indiehosters/git
+    command: ["sh", "-c", "rm -rv /data; git clone https://$${GITHUB_USER}:@$${GITHUB_REPO} /data"]
+    environment:
+      - GITHUB_USER=angrycactus-bot
+      - GITHUB_REPO=github.com/OpenDataStack/kong-config
+    volumes:
+      - kongfig-config-vlm:/data
+    restart: 'no'
+    labels:
+      - io.rancher.container.start_once=true
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:5.6.2
-    container_name: elasticsearch1
-    environment: ['http.host=0.0.0.0', 'transport.host=127.0.0.1', 'xpack.security.enabled=false', 'cluster.name=docker-cluster', 'bootstrap.memory_lock=true', 'ES_JAVA_OPTS=-Xms512m -Xmx512m']
-    ports:
-      - "0.0.0.0:9200:9200"
-    networks: ['stack']
-  
-  kibana:
-    image: opendatastack/ods-kibana:latest
-    container_name: kibana1
-    ports:
-      - "0.0.0.0:5601:5601"
-    networks: ['stack']
-    depends_on: ['elasticsearch']
+    container_name: elasticsearch
+    environment:
+      http.host: "0.0.0.0"
+      transport.host: "127.0.0.1"
+      xpack.security.enabled: "false"
+      cluster.name: "docker-cluster"
+      bootstrap.memory_lock: "true"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -I -s -L http://127.0.0.1:9200 || exit 1"]
+      interval: 5s
+      retries: 10
+      start_period: 10s
 
-networks: {stack: {}}
+  kibana:
+    image: opendatastack/ods-kibana:5.6.2
+    container_name: kibana
+    environment:
+      SERVER_BASEPATH: '/analytics'
+      ELASTICSEARCH_URL: 'http://localhost:19200'
+      ELASTICSEARCH_REQUESTHEADERSWHITELIST: '["x-proxy-user","cookie"]'
+      OWN_HOME_ELASTICSEARCH_URL: 'http://elasticsearch:9200'
+      OWN_HOME_SESSION_SECRETKEY: 'the-password-must-be-at-least-32-characters-long'
+      OWN_HOME_SESSION_ISSECURE: 'false'
+      OWN_HOME_LOCAL_GROUPS: '["common01","common02"]'
+    depends_on:
+      - elasticsearch
+
+  demo:
+    image: blacktop/es-data
+    container_name: demo
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+volumes:
+  kong-plugin-jwt-vlm:
+  kongfig-config-vlm:
