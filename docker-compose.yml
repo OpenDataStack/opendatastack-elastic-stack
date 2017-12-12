@@ -59,7 +59,7 @@ services:
   kongfig:
     image: mashupmill/kongfig
     environment:
-      - OPENDATASTACK_DKAN_CONSUMER_JWT_KEY=dkan_medata
+      - OPENDATASTACK_DKAN_CONSUMER_JWT_KEY=dkan_opendatastack_kibana
       - OPENDATASTACK_DKAN_CONSUMER_JWT_SECRET=e71829c351aa4242c2719cbfbe671c09
     volumes:
       - kongfig-config-vlm:/data/
