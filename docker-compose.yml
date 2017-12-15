@@ -96,7 +96,7 @@ services:
       start_period: 10s
 
   kibana:
-    image: opendatastack/ods-kibana:5.6.2
+    image: opendatastack/kibana:5.6.2
     container_name: kibana
     environment:
       SERVER_BASEPATH: '/analytics'
