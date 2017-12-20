@@ -1,24 +1,27 @@
 # Pull and run Elastic stack 
+1. Clone and cd into this repository directory.
+
+2.
 ```
-$ git clone git@github.com:angrycactus/ods-elastic-stack.git
-$ cd ods-elastic-stack
 $ docker-compose up -d
 ```
-## Test stack
-Open http://localhost:9200. A similar output should be displayed:
-```
+
+3. Generate a JWT token using the debugger over at
+   [https://jwt.io/](https://jwt.io/). The payload should at a minimum contain
+   the issuer ("iss") and own home username ("x-proxy-user").
+
+**Example payload**
+```json
 {
-  "name" : "PDnOU3L",
-  "cluster_name" : "docker-cluster",
-  "cluster_uuid" : "TvBm67CRQZqAVOsDrHEqBg",
-  "version" : {
-    "number" : "5.6.2",
-    "build_hash" : "57e20f3",
-    "build_date" : "2017-09-23T13:16:45.703Z",
-    "build_snapshot" : false,
-    "lucene_version" : "6.6.1"
-  },
-  "tagline" : "You Know, for Search"
+  "iss": "dkan_opendatastack_kibana",
+  "x-proxy-user": "admin"
 }
 ```
-Open http://localhost:5601. The Kibana homepage should be dispayed.
+
+As a JWT secret, use the example key set in the docker-compose variable ("OPENDATASTACK_DKAN_CONSUMER_JWT_SECRET").
+
+The proxy expects the JWT to be made available in a cookie named
+`Drupal.visitor.jwt` by default, to change this behaviour you can set the
+kongfig service env variable "OPENDATASTACK_DKAN_API_PLUGIN_JWT_COOKIE_NAMES"
+to a different setting (cf.
+https://github.com/OpenDataStack/kong-config/blob/master/opendatastack-kibana-jwt.js).
